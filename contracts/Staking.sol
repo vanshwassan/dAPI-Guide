@@ -5,6 +5,10 @@ import "@api3/airnode-protocol-v1/contracts/dapis/DapiReader.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/SignedSafeMath.sol";
+
 contract TokenFarm is DapiReader, Ownable {
     string public name = "Dapp Token Farm";
     IERC20 public dappToken;
@@ -16,7 +20,10 @@ contract TokenFarm is DapiReader, Ownable {
     mapping(address => bytes32) public tokenDapiMapping;
     address[] allowedTokens;
 
-    constructor(address _dapiServer) DapiReader(_dapiServer) {}
+    
+    constructor(address _dapiServer, address _dappTokenAddress) DapiReader(_dapiServer) {
+        dappToken = IERC20(_dappTokenAddress);
+    }
 
     function addAllowedTokens(address token) public onlyOwner {
         allowedTokens.push(token);
@@ -92,6 +99,17 @@ contract TokenFarm is DapiReader, Ownable {
         }
     }
 
+    function int224ToUint256(address token)
+    public
+    view 
+    returns (uint256)
+    {
+        int224 tokenPrice = (getTokenEthPrice(token));
+        uint224 newTokenPrice = uint224(tokenPrice);
+        return newTokenPrice;
+
+    }
+
     function getUserStakingBalanceEthValue(address user, address token)
         public
         view
@@ -100,8 +118,10 @@ contract TokenFarm is DapiReader, Ownable {
         if (uniqueTokensStaked[user] <= 0) {
             return 0;
         }
+        uint256 newTokenPrice = (int224ToUint256(token));
+        uint256 stakBal = (stakingBalance[token][user]);
         return
-            (stakingBalance[token][user] * 1) / (10**18);
+            (stakBal * newTokenPrice) / (10**18);
     }
 
     // Issuing Tokens
@@ -117,10 +137,11 @@ contract TokenFarm is DapiReader, Ownable {
         }
     }
 
-    function getTokenEthPrice(address token) public view returns (int224 value, uint256 timestamp) {
+    function getTokenEthPrice(address token) public view returns (int224 value) {
         bytes32 DapiName = tokenDapiMapping[token];
-        (value, timestamp) = IDapiServer(dapiServer).readDataFeedWithDapiName(
+        (value) = IDapiServer(dapiServer).readDataFeedValueWithDapiName(
                 DapiName
         );
 }
 }
+//18446744073709555618
